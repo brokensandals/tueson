@@ -4,7 +4,17 @@
   "description": "Simple indentation-based object notation matching the JSON object model.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "clean": "rimraf target",
+    "build:cjs": "BABEL_MODULES=cjs babel src/ --out-dir target/cjs/ --ignore src/**/*.test.js",
+    "build:esm": "BABEL_MODULES=false babel src/ --out-dir target/esm/ --ignore src/**/*.test.js",
+    "build:umd": "webpack --mode=production",
+    "build": "npm run clean && npm run build:cjs && npm run build:esm && npm run build:umd",
+    "coverage": "jest --coverage",
+    "lint": "eslint src scripts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:updateSnapshot": "jest --updateSnapshot",
+    "prepublish": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -15,5 +25,21 @@
   "bugs": {
     "url": "https://github.com/brokensandals/tueson/issues"
   },
-  "homepage": "https://github.com/brokensandals/tueson#readme"
+  "homepage": "https://github.com/brokensandals/tueson#readme",
+  "files": [
+    "src",
+    "target"
+  ],
+  "devDependencies": {
+    "@babel/cli": "^7.14.5",
+    "@babel/core": "^7.14.5",
+    "@babel/preset-env": "^7.14.5",
+    "eslint": "^7.28.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.23.4",
+    "jest": "^27.0.4",
+    "rimraf": "^3.0.2",
+    "webpack": "^5.38.1",
+    "webpack-cli": "^4.7.2"
+  }
 }
