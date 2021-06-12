@@ -1,0 +1,26 @@
+map
+  simpleKey1 1
+  simpleKey2 2.345
+  @ugly key 1
+    6
+  @ugly key 2
+    list
+      'a
+      'b
+  emptyChild map
+  emptyChildren list
+  child map
+    foo text exact
+      Some multiline
+
+      text!
+        whatevs
+    bar 'baz
+  children list
+    map
+      position 'first
+    map
+      position 'second
+  nothing null
+  happy yes
+  sad no

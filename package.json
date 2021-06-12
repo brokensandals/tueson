@@ -2,7 +2,8 @@
   "name": "tueson",
   "version": "0.0.1",
   "description": "Simple indentation-based object notation matching the JSON object model.",
-  "main": "index.js",
+  "main": "target/cjs/index.js",
+  "module": "target/esm/index.js",
   "scripts": {
     "clean": "rimraf target",
     "build:cjs": "BABEL_MODULES=cjs babel src/ --out-dir target/cjs/ --ignore src/**/*.test.js",

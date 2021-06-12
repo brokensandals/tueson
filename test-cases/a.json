@@ -1,0 +1,23 @@
+{
+  "simpleKey1": 1,
+  "simpleKey2": 2.345,
+  "ugly key 1": 6,
+  "ugly key 2": ["a", "b"],
+  "emptyChild": {},
+  "emptyChildren": [],
+  "child": {
+    "foo": "Some multiline\n\ntext!\n  whatevs",
+    "bar": "baz"
+  },
+  "children": [
+    {
+      "position": "first"
+    },
+    {
+      "position": "second"
+    }
+  ],
+  "nothing": null,
+  "happy": true,
+  "sad": false
+}
