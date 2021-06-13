@@ -10,7 +10,7 @@ map
   emptyChild map
   emptyChildren list
   child map
-    foo text exact
+    foo text
       Some multiline
 
       text!

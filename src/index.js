@@ -1,8 +1,9 @@
 const NO_ESCAPE_KEY = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 const ESCAPE_CHARS = /[\r\n\\]/g;
+const TRAILING_NEWLINES = /\n*$/;
 
 function escape(raw) {
-  return raw.replace(ESCAPE_CHARS, '\\$&');
+  return raw.replace(/\\/g, '\\\\').replace(/\r/g, '\\r').replace(/\n/g, '\\n');
 }
 
 function stringifyKV(key, value, indent) {
@@ -28,14 +29,17 @@ export function stringify(value, indent = '') {
   }
   const nextIndent = indent + '  ';
   if (typeof value === 'string') {
-    const lines = value.split('\n');
+    const trailing = value.match(TRAILING_NEWLINES)[0];
+    const lines = value.replace(TRAILING_NEWLINES, '').split('\n');
+    lines[lines.length - 1] += trailing;
+
     if (lines.length === 1) {
-      return "'" + escape(value) + "\n";
+      return "'" + escape(lines[0]) + "\n";
     }
     if (lines.some(line => ESCAPE_CHARS.test(line))) {
-      return "text\n" + lines.map(line => (line === '' ? '' : nextIndent) + escape(line) + '\n').join('');
+      return "text escaped\n" + lines.map(line => (line === '' ? '' : nextIndent) + escape(line) + '\n').join('');
     }
-    return "text exact\n" + lines.map(line => (line === '' ? '' : nextIndent) + line + '\n').join('');
+    return "text\n" + lines.map(line => (line === '' ? '' : nextIndent) + line + '\n').join('');
   }
   if (Array.isArray(value)) {
     return "list\n" + value.map(item => nextIndent + stringify(item, nextIndent)).join('');
