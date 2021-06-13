@@ -64,6 +64,7 @@ const CTX_ROOT = 0;
 const CTX_OBJECT = 1;
 const CTX_ARRAY = 2;
 const CTX_STRING = 3;
+const CTX_FIELD = 4;
 
 function ParseCtx(type, container, target, indent) {
   this.type = type;
@@ -73,54 +74,51 @@ function ParseCtx(type, container, target, indent) {
 }
 
 export function parse(string) {
-  const contexts = [new ParseCtx(CTX_ROOT, [], null, 0)];
-  let numBlankTextLines = 0;
+  const contexts = [new ParseCtx(CTX_ROOT, undefined, null, 0)];
+  const lines = string.split('\n');
+  let lineIdx;
+  let result;
+  let blankLines = 0;
 
-  string.split('\n').forEach((line, index) => {
-    const [ _, indentStr, content ] = INDENTED_LINE.match(line);
-    const indent = indentStr.length;
-    
-    if ((indent % 2) != 0) {
-      throw new ParseException('lines should start with an even number of spaces', index + 1);
+  lineLoop:
+  for (lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const [_, indentStr, content] = INDENTED_LINE.match(lines[lineIdx]);
+    if (content.length === 0) {
+      blankLines++;
     }
 
-    const ctx = contexts[contexts.length - 1];
+    let indent = indentStr.length;
+    let ctx = contexts[contexts.length - 1];
     if (content.length > 0) {
-      if (ctx.type === CTX_STRING) {
-        ctx.container.push(''.repeat(numBlankTextLines));
-        numBlankTextLines = 0;
-      }
-    }
-
-    if (content.length > 0) {
-      while (indent < contexts[contexts.length - 1].indent) {
-        const child = contexts.pop();
-        const parent = contexts[contexts.length - 1];
-        switch (parent.type) {
-          case CTX_ARRAY:
-            parent.container.push(child.container);
-            break;
+      while (indent < ctx.indent) {
+        let child = contexts.pop();
+        ctx = contexts[contexts.length - 1];
+        switch (ctx.type) {
+          case CTX_ROOT:
+            result = child.container;
+            break lineLoop;
           case CTX_OBJECT:
-            parent.container[child.target] = child.container;
+            ctx.container[child.target] = child.container;
             break;
-          default:
-            throw "this should be unreachable!";
+          case CTX_ARRAY:
+            ctx.container.push(child.container);
+            break;
+          case CTX_FIELD:
+            const parent = contexts.pop();
+            ctx = contexts[contexts.length - 1];
+            
+            break;
         }
       }
     }
+  };
 
-    if (content.length === 0) {
-      if (ctx.type === CTX_STRING) {
-        numBlankTextLines++;
-      }
-      continue;
-    }
-
-    if (ctx.type === CTX_STRING) {
-      ctx.container += content; // TODO unescape
-      continue;
-    }
-
-    // ...
-  });
+  if (result === undefined) {
+    throw new ParseException('no value found', 1, string);
+  }
+  for (; lineIdx < lines.length && lines[lineIdx].replace(/ /g, '').length === 0; lineIdx++);
+  if (lineIdx !== lines.length) {
+    throw new ParseException('expected end of input', lineIdx, string);
+  }
+  return result;
 }
