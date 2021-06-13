@@ -48,3 +48,79 @@ export function stringify(value, indent = '') {
     return "map\n" + Object.keys(value).map(key => nextIndent + stringifyKV(key, value[key], nextIndent)).join('');
   }
 }
+
+const INDENTED_LINE = /^( )*(.*)/;
+
+export function ParseException(message, lineNum, input) {
+  this.message = message;
+  this.lineNum = lineNum;
+  this.input = input;
+  this.toString = function() {
+    return `Line ${this.lineNum}: ${this.message}`;
+  }
+}
+
+const CTX_ROOT = 0;
+const CTX_OBJECT = 1;
+const CTX_ARRAY = 2;
+const CTX_STRING = 3;
+
+function ParseCtx(type, container, target, indent) {
+  this.type = type;
+  this.container = container;
+  this.target = target;
+  this.indent = indent;
+}
+
+export function parse(string) {
+  const contexts = [new ParseCtx(CTX_ROOT, [], null, 0)];
+  let numBlankTextLines = 0;
+
+  string.split('\n').forEach((line, index) => {
+    const [ _, indentStr, content ] = INDENTED_LINE.match(line);
+    const indent = indentStr.length;
+    
+    if ((indent % 2) != 0) {
+      throw new ParseException('lines should start with an even number of spaces', index + 1);
+    }
+
+    const ctx = contexts[contexts.length - 1];
+    if (content.length > 0) {
+      if (ctx.type === CTX_STRING) {
+        ctx.container.push(''.repeat(numBlankTextLines));
+        numBlankTextLines = 0;
+      }
+    }
+
+    if (content.length > 0) {
+      while (indent < contexts[contexts.length - 1].indent) {
+        const child = contexts.pop();
+        const parent = contexts[contexts.length - 1];
+        switch (parent.type) {
+          case CTX_ARRAY:
+            parent.container.push(child.container);
+            break;
+          case CTX_OBJECT:
+            parent.container[child.target] = child.container;
+            break;
+          default:
+            throw "this should be unreachable!";
+        }
+      }
+    }
+
+    if (content.length === 0) {
+      if (ctx.type === CTX_STRING) {
+        numBlankTextLines++;
+      }
+      continue;
+    }
+
+    if (ctx.type === CTX_STRING) {
+      ctx.container += content; // TODO unescape
+      continue;
+    }
+
+    // ...
+  });
+}
