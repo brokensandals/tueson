@@ -50,13 +50,14 @@ export function stringify(value, indent = '') {
 }
 
 const INDENTED_LINE = /^( )*(.*)/;
+const NUMBER = /^\-?(0|([1-9]\d*))(\.\d+)?([eE][-+]\d+)?$/;
+const CHARCODE = /^[0-9a-fA-F]{4}$/;
 
-export function ParseException(message, lineNum, input) {
+export function ParseException(message, ctx) {
   this.message = message;
-  this.lineNum = lineNum;
-  this.input = input;
+  this.ctx = ctx;
   this.toString = function() {
-    return `Line ${this.lineNum}: ${this.message}`;
+    return `${this.ctx.line}:${this.ctx.col} ${this.message}`;
   }
 }
 
@@ -66,59 +67,122 @@ const CTX_ARRAY = 2;
 const CTX_STRING = 3;
 const CTX_FIELD = 4;
 
-function ParseCtx(type, container, target, indent) {
-  this.type = type;
-  this.container = container;
-  this.target = target;
-  this.indent = indent;
+function advanceChar(ctx) {
+  const char = ctx.input[ctx.index];
+  if (char === '\n') {
+    ctx.line++;
+    ctx.col = 1;
+  } else {
+    ctx.col++;
+  }
+  ctx.index++;
+}
+
+function consumeToNode(ctx) {
+  while (ctx.index < ctx.input.length) {
+    const char = ctx.input[ctx.index];
+    if (char === ' ' || char === '\n') {
+      advanceChar(ctx);
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
+function consumeEscapedString(ctx) {
+  let result = '';
+  while (true) {
+    if (ctx.index >= ctx.input.length) {
+      break;
+    }
+    let char = ctx.input[ctx.index];
+    if (char === '\n') {
+      break;
+    }
+    if (char === '\\') {
+      advanceChar();
+      if (ctx.index >= ctx.input.length) {
+        throw new ParseException('expected "\\", "/", "b", "f", "n", "r", "t", or "uDDDD"', ctx);
+      }
+      char = ctx.input[ctx.index];
+      switch (char) {
+        case '\\':
+        case '/':
+          result += char;
+          break;
+        case 'b':
+          result += '\b';
+          break;
+        case 'f':
+          result += '\f';
+          break;
+        case 'n':
+          result += '\n';
+          break;
+        case 'r':
+          result += '\r';
+          break;
+        case 't':
+          result += '\t';
+          break;
+        case 'u':
+          advanceChar();
+          const hex = ctx.input.slice(ctx.input.index, ctx.input.index + 4);
+          if (!CHARCODE.test(hex)) {
+            throw new ParseException('expected 4 hex digits', ctx);
+          }
+          result += JSON.parse('"\\u' + hex + '"');
+          ctx.index += 4;
+          ctx.col += 4;
+          break;
+        default:
+          throw new ParseException('expected "\\", "/", "b", "f", "n", "r", "t", or "uDDDD"', ctx);
+      }
+    }
+  }
+  return result;
+}
+
+function consumeValue(ctx) {
+  const line = ctx.slice(ctx.index).splice('\n', 1);
+  if (line.startsWith("'")) {
+    advanceChar();
+    return consumeEscapedString(ctx);
+  }
+  if (NUMBER.test(line)) {
+    const value = JSON.parse(line);
+    ctx.index += line.length;
+    ctx.col += line.length;
+    return value;
+  }
+  switch (line) {
+    case 'record':
+      break;
+    case 'list':
+      break;
+    case 'text':
+      break;
+    case 'esctext':
+      break;
+  }
+  throw new ParseException('expected "\'", "record", "list", "text", "esctext", or a number', ctx);
 }
 
 export function parse(string) {
-  const contexts = [new ParseCtx(CTX_ROOT, undefined, null, 0)];
-  const lines = string.split('\n');
-  let lineIdx;
-  let result;
-  let blankLines = 0;
-
-  lineLoop:
-  for (lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const [_, indentStr, content] = INDENTED_LINE.match(lines[lineIdx]);
-    if (content.length === 0) {
-      blankLines++;
-    }
-
-    let indent = indentStr.length;
-    let ctx = contexts[contexts.length - 1];
-    if (content.length > 0) {
-      while (indent < ctx.indent) {
-        let child = contexts.pop();
-        ctx = contexts[contexts.length - 1];
-        switch (ctx.type) {
-          case CTX_ROOT:
-            result = child.container;
-            break lineLoop;
-          case CTX_OBJECT:
-            ctx.container[child.target] = child.container;
-            break;
-          case CTX_ARRAY:
-            ctx.container.push(child.container);
-            break;
-          case CTX_FIELD:
-            const parent = contexts.pop();
-            ctx = contexts[contexts.length - 1];
-            
-            break;
-        }
-      }
-    }
+  let ctx = {
+    line: 1,
+    col: 1,
+    index: 0,
+    input: string,
+    indent: 0
   };
-
-  if (result === undefined) {
-    throw new ParseException('no value found', 1, string);
+  if (!consumeToNode(ctx)) {
+    throw new ParseException('the input was just whitespace; expected to find a value', ctx);
   }
-  for (; lineIdx < lines.length && lines[lineIdx].replace(/ /g, '').length === 0; lineIdx++);
-  if (lineIdx !== lines.length) {
-    throw new ParseException('expected end of input', lineIdx, string);
+  const root = consumeValue(ctx);
+  if (consumeToNode(ctx)) {
+    throw new ParseException('expected the input to end', ctx);
   }
-  return result;
+  return root;
 }
