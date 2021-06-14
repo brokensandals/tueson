@@ -37,7 +37,7 @@ export function stringify(value, indent = '') {
       return "'" + escape(lines[0]) + "\n";
     }
     if (lines.some(line => ESCAPE_CHARS.test(line))) {
-      return "text escaped\n" + lines.map(line => (line === '' ? '' : nextIndent) + escape(line) + '\n').join('');
+      return "esctext\n" + lines.map(line => (line === '' ? '' : nextIndent) + escape(line) + '\n').join('');
     }
     return "text\n" + lines.map(line => (line === '' ? '' : nextIndent) + line + '\n').join('');
   }
@@ -45,7 +45,7 @@ export function stringify(value, indent = '') {
     return "list\n" + value.map(item => nextIndent + stringify(item, nextIndent)).join('');
   }
   if (typeof value === 'object') {
-    return "map\n" + Object.keys(value).map(key => nextIndent + stringifyKV(key, value[key], nextIndent)).join('');
+    return "record\n" + Object.keys(value).map(key => nextIndent + stringifyKV(key, value[key], nextIndent)).join('');
   }
 }
 

@@ -1,4 +1,4 @@
-map
+record
   simpleKey1 1
   simpleKey2 2.345
   @ugly key 1
@@ -7,9 +7,9 @@ map
     list
       'a
       'b
-  emptyChild map
+  emptyChild record
   emptyChildren list
-  child map
+  child record
     foo text
       Some multiline
 
@@ -17,9 +17,9 @@ map
         whatevs
     bar 'baz
   children list
-    map
+    record
       position 'first
-    map
+    record
       position 'second
   nothing null
   happy yes

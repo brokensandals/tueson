@@ -1,5 +1,5 @@
-map
-  foo text escaped
+record
+  foo esctext
     This string has multiple lines.
 
     There are blank lines in the middle and at the end.\n\n
