@@ -49,140 +49,81 @@ export function stringify(value, indent = '') {
   }
 }
 
-const INDENTED_LINE = /^( )*(.*)/;
+const INDENTED_LINE = /^( *)(.*)/;
 const NUMBER = /^\-?(0|([1-9]\d*))(\.\d+)?([eE][-+]\d+)?$/;
 const CHARCODE = /^[0-9a-fA-F]{4}$/;
 
-export function ParseException(message, ctx) {
+class Position {
+  constructor(string, index) {
+    this.string = string;
+    this.index = index;
+  }
+
+  lineNum() {
+    let line = 1;
+    for (let i = 0; i < this.index; i++) {
+      if (this.string[i] == '\n') {
+        line++;
+      }
+    }
+    return line;
+  }
+
+  colNum() {
+    let col = 1;
+    for (let i = this.index; i >= 0 && this.string[i] != '\n'; i--) {
+      col--;
+    }
+    return col;
+  }
+}
+
+export function ParseException(message, pos) {
   this.message = message;
-  this.ctx = ctx;
+  this.pos = pos;
   this.toString = function() {
-    return `${this.ctx.line}:${this.ctx.col} ${this.message}`;
+    return `${this.pos.lineNum()}:${this.pos.colNum()} ${this.message}`;
   }
 }
 
-const CTX_ROOT = 0;
-const CTX_OBJECT = 1;
-const CTX_ARRAY = 2;
-const CTX_STRING = 3;
-const CTX_FIELD = 4;
-
-function advanceChar(ctx) {
-  const char = ctx.input[ctx.index];
-  if (char === '\n') {
-    ctx.line++;
-    ctx.col = 1;
-  } else {
-    ctx.col++;
-  }
-  ctx.index++;
-}
-
-function consumeToNode(ctx) {
-  while (ctx.index < ctx.input.length) {
-    const char = ctx.input[ctx.index];
-    if (char === ' ' || char === '\n') {
-      advanceChar(ctx);
-    } else {
-      return true;
-    }
-  }
-  return false;
-}
-
-function consumeEscapedString(ctx) {
-  let result = '';
-  while (true) {
-    if (ctx.index >= ctx.input.length) {
-      break;
-    }
-    let char = ctx.input[ctx.index];
-    if (char === '\n') {
-      break;
-    }
-    if (char === '\\') {
-      advanceChar();
-      if (ctx.index >= ctx.input.length) {
-        throw new ParseException('expected "\\", "/", "b", "f", "n", "r", "t", or "uDDDD"', ctx);
-      }
-      char = ctx.input[ctx.index];
-      switch (char) {
-        case '\\':
-        case '/':
-          result += char;
-          break;
-        case 'b':
-          result += '\b';
-          break;
-        case 'f':
-          result += '\f';
-          break;
-        case 'n':
-          result += '\n';
-          break;
-        case 'r':
-          result += '\r';
-          break;
-        case 't':
-          result += '\t';
-          break;
-        case 'u':
-          advanceChar();
-          const hex = ctx.input.slice(ctx.input.index, ctx.input.index + 4);
-          if (!CHARCODE.test(hex)) {
-            throw new ParseException('expected 4 hex digits', ctx);
-          }
-          result += JSON.parse('"\\u' + hex + '"');
-          ctx.index += 4;
-          ctx.col += 4;
-          break;
-        default:
-          throw new ParseException('expected "\\", "/", "b", "f", "n", "r", "t", or "uDDDD"', ctx);
+function parseTree(string) {
+  const root = {
+    pos: new Position(string, 0),
+    indent: -2,
+    content: '',
+    parent: null,
+    children: [],
+  };
+  let index = 0;
+  let parent = root;
+  string.split('\n').forEach(line => {
+    let [ _, indentStr, content ] = line.match(INDENTED_LINE);
+    const pos = new Position(string, index)
+    const indent = indentStr.length;
+    let blank = true;
+    if (content.length !== 0) {
+      blank = false;
+      while (indent <= parent.indent) {
+        parent = parent.parent;
       }
     }
-  }
-  return result;
-}
-
-function consumeValue(ctx) {
-  const line = ctx.slice(ctx.index).splice('\n', 1);
-  if (line.startsWith("'")) {
-    advanceChar();
-    return consumeEscapedString(ctx);
-  }
-  if (NUMBER.test(line)) {
-    const value = JSON.parse(line);
-    ctx.index += line.length;
-    ctx.col += line.length;
-    return value;
-  }
-  switch (line) {
-    case 'record':
-      break;
-    case 'list':
-      break;
-    case 'text':
-      break;
-    case 'esctext':
-      break;
-  }
-  throw new ParseException('expected "\'", "record", "list", "text", "esctext", or a number', ctx);
+    const node = { pos, indent, content, parent, children: [] };
+    parent.children.push(node);
+    if (!blank) {
+      parent = node;
+    }
+    index += line.length + 1;
+  });
+  return root;
 }
 
 export function parse(string) {
-  let ctx = {
-    line: 1,
-    col: 1,
-    index: 0,
-    input: string,
-    indent: 0
-  };
-  if (!consumeToNode(ctx)) {
-    throw new ParseException('the input was just whitespace; expected to find a value', ctx);
+  const tree = parseTree(string);
+  const roots = tree.children.filter(node => !node.blank && node.indent === 0);
+  if (roots.length === 0) {
+    throw new ParseException('expected a value starting at the leftmost column', new Position(string, 0));
   }
-  const root = consumeValue(ctx);
-  if (consumeToNode(ctx)) {
-    throw new ParseException('expected the input to end', ctx);
+  if (roots.length > 1) {
+    throw new ParseException('found multiple values starting at the leftmost column, expected only one', roots[1].pos);
   }
-  return root;
 }
