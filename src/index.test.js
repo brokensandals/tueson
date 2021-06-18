@@ -8,11 +8,20 @@ fs.readdirSync(testCasesDir).forEach(filename => {
   if (filename.endsWith('.json')) {
     test(filename, () => {
       const outPath = inPath.replace('.json', '.tueson');
-      const json = fs.readFileSync(inPath, { encoding: 'utf8' });
-      const parsed = JSON.parse(json);
-      const stringified = tueson.stringify(parsed);
-      const expected = fs.readFileSync(outPath, { encoding: 'utf8' });
-      expect(stringified).toEqual(expected);
+      const jsonStr = fs.readFileSync(inPath, { encoding: 'utf8' });
+      const jsonParsed = JSON.parse(jsonStr);
+      const tuesonStr = tueson.stringify(jsonParsed);
+      const expectedStr = fs.readFileSync(outPath, { encoding: 'utf8' });
+      expect(tuesonStr).toEqual(expectedStr);
+    });
+  } else if (filename.endsWith('.tueson')) {
+    test(filename, () => {
+      const outPath = inPath.replace('.tueson', '.json');
+      const jsonStr = fs.readFileSync(outPath, { encoding: 'utf8' });
+      const jsonParsed = JSON.parse(jsonStr);
+      const tuesonStr = fs.readFileSync(inPath, { encoding: 'utf8' });
+      const tuesonParsed = tueson.parse(tuesonStr);
+      expect(tuesonParsed).toEqual(jsonParsed);
     });
   }
 });
