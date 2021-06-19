@@ -163,6 +163,9 @@ function unescape(escaped, pos) {
         case '\\':
           escaped += '\\';
           break;
+        case 'b':
+          escaped += '\b';
+          break;
         case 'u':
           i++;
           const charcode = escaped.slice(i, i + 4);
