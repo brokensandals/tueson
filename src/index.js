@@ -76,6 +76,10 @@ class Position {
     }
     return col;
   }
+
+  plus(index) {
+    return new Position(this.string, this.index + index);
+  }
 }
 
 export function ParseException(message, pos) {
@@ -93,6 +97,7 @@ function parseTree(string) {
     content: '',
     parent: null,
     children: [],
+    nonBlankChildren: []
   };
   let index = 0;
   let parent = root;
@@ -107,9 +112,10 @@ function parseTree(string) {
         parent = parent.parent;
       }
     }
-    const node = { pos, indent, content, parent, children: [] };
+    const node = { pos, indent, content, parent, children: [], nonBlankChildren: [] };
     parent.children.push(node);
     if (!blank) {
+      parent.nonBlankChildren.push(node);
       parent = node;
     }
     index += line.length + 1;
@@ -117,13 +123,162 @@ function parseTree(string) {
   return root;
 }
 
+function flattenDescendants(node) {
+  const result = [];
+  function recur(node) {
+    node.children.forEach(child => {
+      result.push(child);
+      flattenDescendants(child);
+    });
+  }
+  recur(node);
+  return result;
+}
+
+function removeTrailingBlankNodesDestructive(nodeList) {
+  for (let i = nodeList.length - 1; i >= 0 && nodeList[i].blank; i--) {
+    nodeList.pop();
+  }
+  return nodeList;
+}
+
+function unescape(escaped, pos) {
+  let result = '';
+  for (let i = 0; i < escaped.length; i++) {
+    if (escaped[i] === '\\') {
+      i++;
+      if (i >= escaped.length) {
+        throw new ParseException('expected escape character', pos.plus(i));
+      }
+      switch (escaped[i]) {
+        case 't':
+          escaped += '\t';
+          break;
+        case 'n':
+          escaped += '\n';
+          break;
+        case 'f':
+          escaped += '\f';
+          break;
+        case 'r':
+          escaped += '\r';
+          break;
+        case '\\':
+          escaped += '\\';
+          break;
+        case 'u':
+          i++;
+          const charcode = escaped.slice(i, i + 4);
+          if (!CHARCODE.test(charcode)) {
+            throw new ParseException('expected 4 hexadecimal digits', pos.plus(i));
+          }
+          escaped += JSON.parse('"\\u' + charcode) + '"';
+          i += 3;
+          break;
+        default:
+          throw new ParseException('unrecognized escape character: ' + escaped[i], pos.plus(i));
+      }
+    } else {
+      result += escaped[i];
+    }
+  }
+  return result;
+}
+
+function parseValue(node, index) {
+  const value = node.content.slice(index);
+  const indent = node.indent + 2;
+  switch (value) {
+    case 'yes':
+      return true;
+    case 'no':
+      return false;
+    case 'null':
+      return null;
+    case 'record':
+      const record = {};
+      node.nonBlankChildren.forEach(child => {
+        if (child.indent !== indent) {
+          throw new ParseException('record fields should be indented exactly two spaces', child.pos.plus(child.indent));
+        }
+        if (child.content[0] === '@') {
+          const key = unescape(child.content.slice(1), child.pos.plus(1));
+          if (child.nonBlankChildren.length < 1) {
+            throw new ParseException('after an escaped record key, the value should be on the next line, indented exactly two spaces further', child.pos.plus(child.indent + child.content.length));
+          }
+          if (child.nonBlankChildren.length > 1) {
+            throw new ParseException('an escaped record key should not have multiple children', child.nonBlankChildren[1].pos);
+          }
+          const grandchild = child.nonBlankChildren[0];
+          if (grandchild.indent !== indent + 2) {
+            throw new ParseException('after an escaped record key, the value should indented exactly two spaces further', grandchild.pos.plus(grandchild.indent));
+          }
+          record[key] = parseValue(grandchild, 0);
+        } else {
+          const kv = child.content.split(' ', 2);
+          if (kv.length < 2) {
+            throw new ParseException('record key-value pairs should contain a space after the field name', child.pos.plus(child.indent + child.content.length));
+          }
+          if (!NO_ESCAPE_KEY.test(kv[0])) {
+            throw new ParseException('this record key must go on its own line beginning with "@": ' + kv[0], child.pos.plus(child.indent));
+          }
+          record[kv[0]] = parseValue(child, kv[0].length + 1);
+        }
+      });
+      return record;
+    case 'list':
+      const list = [];
+      node.nonBlankChildren.forEach(child => {
+        if (child.indent !== indent) {
+          throw new ParseException('list elements should be indented exactly two spaces', child.pos.plus(child.indent));
+        }
+        list.push(parseValue(child, 0));
+      });
+      return list;
+    case 'text':
+      const textlines = [];
+      removeTrailingBlankNodesDestructive(flattenDescendants(node)).forEach(child => {
+        if (child.indent >= indent) {
+          const extraIndent = child.indent - indent;
+          textlines.push(' '.repeat(extraIndent) + child.content);
+        } else if (!child.blank) {
+          throw new ParseException('text should be indented at least two spaces past the parent node', node.pos.plus(child.indent));
+        }
+      });
+      return textlines.join('\n');
+    case 'esctext':
+      const esctextlines = [];
+      removeTrailingBlankNodesDestructive(flattenDescendants(node)).forEach(child => {
+        if (child.indent >= indent) {
+          const extraIndent = child.indent - indent;
+          esctextlines.push(' '.repeat(extraIndent) + unescape(child.content));
+        } else if (!child.blank) {
+          throw new ParseException('text should be indented at least two spaces past the parent node', node.pos.plus(child.indent));
+        }
+      });
+      return esctextlines.join('\n');
+    default:
+      if (NUMBER.test(value)) {
+        if (node.nonBlankChildren.length > 0) {
+          throw new ParseException('numbers should not have any children', node.nonBlankChildren[0].pos);
+        }
+        return JSON.parse(value);
+      }
+      if (value[0] === "'") {
+        return unescape(value.slice(1), node.pos.plus(1));
+      }
+      throw new ParseException('expected "record", "list", "text", "esctext", "yes", "no", "null", number, or string', node.pos.plus(index));
+  }
+}
+
 export function parse(string) {
   const tree = parseTree(string);
-  const roots = tree.children.filter(node => !node.blank && node.indent === 0);
+  const roots = tree.nonBlankChildren.filter(node => node.indent === 0);
   if (roots.length === 0) {
     throw new ParseException('expected a value starting at the leftmost column', new Position(string, 0));
   }
   if (roots.length > 1) {
     throw new ParseException('found multiple values starting at the leftmost column, expected only one', roots[1].pos);
   }
+  return parseValue(roots[0], 0);
 }
