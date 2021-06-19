@@ -1,0 +1,18 @@
+{
+  "favoriteColor": "light green",
+  "aFewFavoriteBooks": [
+    {
+      "title": "Educated",
+      "author": "Tara Westover"
+    },
+    {
+      "title": "Jonathan Strange & Mr. Norrell",
+      "author": "Susanna Clarke"
+    },
+    {
+      "title": "The Dispossessed",
+      "author": "Ursula K. Le Guin"
+    }
+  ],
+  "bio": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse in ultrices quam. Pellentesque congue purus nec purus vehicula pellentesque.\n\nEtiam a risus ultricies, tincidunt mauris ut, pharetra erat. Morbi imperdiet ipsum vel mi cursus suscipit. Proin aliquam at tortor eu facilisis.\n\nPhasellus dignissim lorem volutpat bibendum tempor."
+}

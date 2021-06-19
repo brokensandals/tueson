@@ -1,0 +1,18 @@
+record
+  favoriteColor 'light green
+  aFewFavoriteBooks list
+    record
+      title 'Educated
+      author 'Tara Westover
+    record
+      title 'Jonathan Strange & Mr. Norrell
+      author 'Susanna Clarke
+    record
+      title 'The Dispossessed
+      author 'Ursula K. Le Guin
+  bio text
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse in ultrices quam. Pellentesque congue purus nec purus vehicula pellentesque.
+
+    Etiam a risus ultricies, tincidunt mauris ut, pharetra erat. Morbi imperdiet ipsum vel mi cursus suscipit. Proin aliquam at tortor eu facilisis.
+
+    Phasellus dignissim lorem volutpat bibendum tempor.
