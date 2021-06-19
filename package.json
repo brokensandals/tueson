@@ -4,6 +4,9 @@
   "description": "Simple indentation-based object notation matching the JSON object model.",
   "main": "target/cjs/index.js",
   "module": "target/esm/index.js",
+  "bin": {
+    "tueson": "target/cjs/cli.js"
+  },
   "scripts": {
     "clean": "rimraf target",
     "build:cjs": "BABEL_MODULES=cjs babel src/ --out-dir target/cjs/ --ignore src/**/*.test.js",
