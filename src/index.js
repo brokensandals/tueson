@@ -71,8 +71,8 @@ class Position {
 
   colNum() {
     let col = 1;
-    for (let i = this.index; i >= 0 && this.string[i] != '\n'; i--) {
-      col--;
+    for (let i = this.index; i > 0 && this.string[i] != '\n'; i--) {
+      col++;
     }
     return col;
   }
@@ -83,11 +83,8 @@ class Position {
 }
 
 export function ParseException(message, pos) {
-  this.message = message;
   this.pos = pos;
-  this.toString = function() {
-    return `${this.pos.lineNum()}:${this.pos.colNum()} ${this.message}`;
-  }
+  this.message = `${this.pos.lineNum()}:${this.pos.colNum()} ${message}`;
 }
 
 function parseTree(string) {
@@ -106,13 +103,13 @@ function parseTree(string) {
     const pos = new Position(string, index)
     const indent = indentStr.length;
     let blank = true;
-    if (content.length !== 0) {
+    if (content.length > 0) {
       blank = false;
       while (indent <= parent.indent) {
         parent = parent.parent;
       }
     }
-    const node = { pos, indent, content, parent, children: [], nonBlankChildren: [] };
+    const node = { pos, indent, content, parent, children: [], nonBlankChildren: [], blank };
     parent.children.push(node);
     if (!blank) {
       parent.nonBlankChildren.push(node);
@@ -128,7 +125,7 @@ function flattenDescendants(node) {
   function recur(node) {
     node.children.forEach(child => {
       result.push(child);
-      flattenDescendants(child);
+      recur(child);
     });
   }
   recur(node);
@@ -242,7 +239,9 @@ function parseValue(node, index) {
           const extraIndent = child.indent - indent;
           textlines.push(' '.repeat(extraIndent) + child.content);
         } else if (!child.blank) {
-          throw new ParseException('text should be indented at least two spaces past the parent node', node.pos.plus(child.indent));
+          throw new ParseException('text should be indented at least two spaces past the parent node', child.pos.plus(child.indent));
+        } else {
+          textlines.push(child.content);
         }
       });
       return textlines.join('\n');
@@ -253,7 +252,9 @@ function parseValue(node, index) {
           const extraIndent = child.indent - indent;
           esctextlines.push(' '.repeat(extraIndent) + unescape(child.content));
         } else if (!child.blank) {
-          throw new ParseException('text should be indented at least two spaces past the parent node', node.pos.plus(child.indent));
+          throw new ParseException('text should be indented at least two spaces past the parent node', child.pos.plus(child.indent));
+        } else {
+          esctextlines.push(child.content);
         }
       });
       return esctextlines.join('\n');
