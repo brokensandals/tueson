@@ -5,7 +5,7 @@
   "main": "target/cjs/index.js",
   "module": "target/esm/index.js",
   "bin": {
-    "tueson": "target/cjs/cli.js"
+    "tueson": "./target/cjs/cli.js"
   },
   "scripts": {
     "clean": "rimraf target",
